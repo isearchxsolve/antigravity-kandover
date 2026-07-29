@@ -1,0 +1,4 @@
+=== static checks (compile + deps + comfy_client + workflows + configs/shots) ===
+[static] OK -- all sources compile, deps present, graphs/_bind valid, configs/shots parse.
+
+[selftest --quick] ALL GREEN (static).

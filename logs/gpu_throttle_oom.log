@@ -1,0 +1,51 @@
+========================================================================
+GPU THROTTLE + OOM PREVENTION TEST (production path)
+========================================================================
+
+[A] render_motion.py GPU safety stack integration
+  [PASS] A1 render_motion imports gpu_scheduler -- production path has no GPU scheduler — only GPU 0 used, GPU 1 idle
+  [PASS] A2 render_motion imports thermal_monitor -- production path has no thermal monitor — T4 will throttle
+  [PASS] A3 render_motion imports vram_governor -- production path has no VRAM governor — no adaptive OOM prevention
+  [PASS] A4 render_motion main() creates gpu_scheduler.Scheduler -- main() does not create a GPU scheduler — shots run sequentially on GPU 0
+  [PASS] A5 render_motion main() calls sched.pick() -- main() does not call sched.pick() — no round-robin GPU assignment
+  [PASS] A6 render_motion main() calls sched.finish() -- main() does not call sched.finish() — no thermal gap tracking
+  [PASS] A7 render_motion() accepts gpu_idx parameter -- render_motion() has no gpu_idx param — cannot target specific GPU
+  [PASS] A8 render_motion() calls thermal_monitor.snapshot -- no thermal snapshot before render — no throttle forensics
+  [PASS] A9 render_motion() calls vg.resolve_params or vram_governor.resolve_params -- no VRAM regime resolution — OOM risk on T4 with <8GB free
+  [PASS] A10 render_motion main() guards torch.cuda.empty_cache() for torch=None -- main() calls torch.cuda.empty_cache() without checking if torch is None
+
+[B] render_stills.py GPU safety stack integration
+  [PASS] B1 render_stills imports gpu_scheduler -- stills path has no GPU scheduler
+  [PASS] B2 render_stills imports thermal_monitor -- stills path has no thermal monitor
+  [PASS] B3 render_stills imports vram_governor -- stills path has no VRAM governor
+  [PASS] B4 render_stills main() creates Scheduler -- stills main() does not create a GPU scheduler
+
+[C] comfy_client.py CUDA config correctness
+  [PASS] C1 comfy_client has no duplicate PYTORCH_CUDA_ALLOC_CONF setdefault -- found 1 occurrences (should be <=1)
+  [PASS] C2 comfy_client max_split_size_mb >= 128 -- max_split_size_mb:64 is too aggressive for T4 — causes fragmentation
+  [PASS] C3 comfy_client PYTORCH_CUDA_ALLOC_CONF matches notebook (128) -- comfy_client sets max_split_size_mb to 64, overriding notebook's 128
+
+[D] vram_governor T4 regime correctness
+  [PASS] D1 vram_governor returns valid regime for unknown GPU -- got regime=t4_critical
+  [PASS] D2 pick_regime(12*1024) == T4_PLENTY
+  [PASS] D3 pick_regime(8*1024) == T4_TIGHT
+  [PASS] D4 pick_regime(4*1024) == T4_DANGER
+  [PASS] D5 pick_regime(2*1024) == T4_CRITICAL
+  [PASS] D6 SAFE_RESERVE_MB >= 2048 -- SAFE_RESERVE_MB=2048
+
+[E] gpu_scheduler thermal settings
+  [PASS] E1 THROTTLE_TEMP_C <= 80 -- THROTTLE_TEMP_C=78
+  [PASS] E2 MIN_GAP_SEC >= 15 -- MIN_GAP_SEC=20.0
+  [PASS] E3 TEMP_GREEN_C < THROTTLE_TEMP_C -- TEMP_GREEN_C=70 >= THROTTLE_TEMP_C=78
+  [PASS] E4 Scheduler.pick() returns 0 when no GPUs -- Scheduler.pick() crashed or returned negative
+  [PASS] E5 Scheduler.finish(999) does not crash
+
+[F] render_motion OOM fallback tier correctness
+  [PASS] F1 OOM fallback rounds to multiples of 64 -- OOM fallback does not round resolution to VAE-compatible multiples of 64
+  [PASS] F2 OOM fallback has >= 4 tiers -- not enough fallback tiers
+  [PASS] F3 OOM fallback catches 'CUDA out of memory' -- OOM fallback does not catch CUDA OOM errors
+  [PASS] F4 OOM fallback calls gc.collect() on OOM -- OOM fallback does not call gc.collect()
+
+========================================================================
+RESULT: 32 passed, 0 failed
+========================================================================
