@@ -132,6 +132,8 @@ def pipeline(fast):
     cfg_path = os.path.join(ROOT, "config_selftest.yaml")
     yaml.safe_dump(cfg, open(cfg_path, "w"))
 
+    # This test path is explicitly mock-only.  Real GPU proof belongs to
+    # gpu_smoke.py, which refuses COMFY_MOCK=1 and never invokes this helper.
     env = dict(os.environ)
     env.update({"COMFY_MOCK": "1", "POST_MODE": "cpu", "KIT_CONFIG": "config_selftest.yaml"})
     if fast:
@@ -216,6 +218,7 @@ def motion_pipeline(fast):
     cfg_path = os.path.join(ROOT, "config_selftest_motion.yaml")
     yaml.safe_dump(cfg, open(cfg_path, "w"))
 
+    # Keep the CPU regression isolated from the real GPU smoke gate.
     env = dict(os.environ)
     env.update({"COMFY_MOCK": "1", "POST_MODE": "cpu", "KIT_CONFIG": "config_selftest_motion.yaml"})
     if fast:

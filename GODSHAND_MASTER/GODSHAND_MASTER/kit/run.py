@@ -50,6 +50,8 @@ def stage(title, *cmd):
     if r.returncode != 0:
         print(f"[FAIL] stage '{title}' exited {r.returncode} -- stopping (nothing downstream runs).")
         sys.exit(r.returncode)
+    with open(os.path.join(ROOT, "stage_status.json"), "w", encoding="utf-8") as handle:
+        json.dump({"last_successful_stage": title, "command": list(cmd), "status": "PASS"}, handle, indent=2)
 
 
 def main():
@@ -166,11 +168,11 @@ def main():
     master_path = os.path.join(ROOT, cfg["paths"]["out"], f"{title_slug}.mp4")
     if os.path.exists(master_path):
         print(f"[qc] final master -> {master_path} ({os.path.getsize(master_path)/1e6:.0f}MB)")
-        # qc.py runs across work/<id>/final.mp4; the master is a single file, so we
-        # run a focused ffmpeg sanity probe (streams present, non-zero dur, no black).
-        _qc_master(master_path)
+        # This is a probe-only CLI contract; it must not re-enter main().
+        stage("14/14 final master quality gate (qc.py --master)",
+              PY, os.path.join(SRC, "qc.py"), "--master", master_path)
     else:
-        print(f"[qc] master not found at {master_path} -- skipping final gate.")
+        raise SystemExit("FINAL_MASTER_MISSING")
     print("\nDONE -> output_confrontation/THE_CONFRONTATION_CLIP.mp4")
 
 

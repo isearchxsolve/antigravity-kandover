@@ -13,6 +13,8 @@ ROUGH TRIAGE ONLY: sharpness and flicker (uncalibrated until tuned on real frame
     python3 src/qc.py --clips    # checks output/clips/<id>/<id>_master.mp4 instead
 """
 import os, sys, json, re, subprocess, argparse
+from pathlib import Path
+from mock_logging import log
 
 DEFAULT_TH = {"min_w": 640, "min_h": 360, "dur_tol": 0.75, "fps_tol": 1.5,
                "sharp_min": 15, "flicker_max": 12, "lufs_hi": -9, "lufs_lo": -30,
@@ -332,12 +334,48 @@ def check(path, expect_dur, fps_target, th, cfg=None):
             issues.append(f"audio drift {sync['drift']:.3f}s vs video")
             verdict = _worse(verdict, "FAIL")
 
+    log("INFO" if verdict != "FAIL" else "ERROR", "qc_check", stage="qc", gate="E1/F1/E4",
+        input=str(path), expected_duration=expect_dur, expected_fps=fps_target,
+        thresholds=th, measured=stats, verdict=verdict, issues=issues)
+    return verdict, issues, stats
+
+
+def _write_report(path: Path, records: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"records": records}, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _exit_from_records(records: list[dict], report: Path) -> int:
+    failures = [record["shot_id"] for record in records if record["verdict"] == "FAIL"]
+    print(f"[qc] report={report} checked={len(records)} failures={failures}")
+    return 1 if failures else 0
+
+
+def check_master(path: Path, th: dict, cfg: dict) -> tuple[str, list[str], dict]:
+    """Focused master gate; it never invokes the orchestrator."""
+    verdict, issues, stats = check(str(path), 0, 0, th, cfg)
+    info = ffprobe(str(path))
+    audio = [s for s in info.get("streams", []) if s.get("codec_type") == "audio"]
+    require_audio = bool((cfg.get("delivery", {}) or {}).get("require_audio", True))
+    if require_audio and not audio:
+        issues.append("master audio required by delivery policy")
+        verdict = "FAIL"
+    log("INFO" if verdict != "FAIL" else "ERROR", "master_qc", stage="qc", gate="E4/F3",
+        input=str(path), require_audio=require_audio, measured=stats, verdict=verdict, issues=issues)
     return verdict, issues, stats
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--clips", action="store_true", help="check output/clips masters instead of work clips")
+    ap.add_argument("--shots-dir", type=Path, help="check each <shot>/final.mp4 in this directory")
+    ap.add_argument("--master", type=Path, help="probe only this final master and exit")
+    ap.add_argument("--report", type=Path, help="write JSON report (defaults beside explicit input)")
+    ap.add_argument("--verbose", action="store_true", help="write structured mock/CPU evidence JSONL")
     a = ap.parse_args()
+    if a.verbose:
+        os.environ["KIT_VERBOSE"] = "1"
+    if a.shots_dir and a.master:
+        ap.error("--shots-dir and --master are mutually exclusive")
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.insert(0, os.path.join(root, "src"))
     from cfgutil import load_cfg
@@ -360,20 +398,38 @@ def main():
             th["fps_tol"] = min(th["fps_tol"], 0.5)
         print(f"[qc] KIT_4K_DELIVERY=1 active -> min_w>={th['min_w']}, "
               f"min_h>={th['min_h']}, fps_tol<={th['fps_tol']}")
-    work = cfg["paths"]["work"]
+    if a.master:
+        if not a.master.is_file():
+            print(f"MASTER_MISSING:{a.master}", file=sys.stderr)
+            return 2
+        verdict, issues, stats = check_master(a.master, th, cfg)
+        report = a.report or a.master.with_suffix(a.master.suffix + ".qc.json")
+        records = [{"shot_id": a.master.name, "path": str(a.master), "verdict": verdict,
+                    "issues": issues, "stats": stats}]
+        _write_report(report, records)
+        return _exit_from_records(records, report)
+    if a.shots_dir and not a.shots_dir.is_dir():
+        print(f"SHOTS_DIR_INVALID:{a.shots_dir}", file=sys.stderr)
+        return 2
+    work = str(a.shots_dir) if a.shots_dir else cfg["paths"]["work"]
     out = os.path.join(root, cfg["paths"]["out"])
     fps_target = cfg.get("interpolate_fps", cfg.get("fps", 24))
-    shots = json.load(open(os.path.join(root, cfg["shots_file"])))["shots"]
+    shots = (json.load(open(os.path.join(root, cfg["shots_file"])))["shots"] if not a.shots_dir
+             else [{"id": p.name, "dur": 0} for p in sorted(a.shots_dir.iterdir()) if p.is_dir()])
     fails = warns = passes = 0
+    records = []
     for s in shots:
         sid = s["id"]
         path = (os.path.join(out, "clips", sid, f"{sid}_master.mp4") if a.clips
                 else os.path.join(work, sid, "final.mp4"))
         verdict, issues, stats = check(path, s.get("dur", 0), fps_target, th, cfg)
         fails += verdict == "FAIL"; warns += verdict == "WARN"; passes += verdict == "PASS"
+        records.append({"shot_id": sid, "path": path, "verdict": verdict, "issues": issues, "stats": stats})
         print(f"[{verdict}] {sid}  {stats}  {'; '.join(issues) if issues else 'ok'}")
     print(f"\n[qc] {len(shots)} checked: {passes} PASS, {warns} WARN, {fails} FAIL")
-    sys.exit(1 if fails else 0)
+    report = a.report or (a.shots_dir / "qc_report.json" if a.shots_dir else Path(work) / "qc_report.json")
+    _write_report(report, records)
+    return _exit_from_records(records, report)
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

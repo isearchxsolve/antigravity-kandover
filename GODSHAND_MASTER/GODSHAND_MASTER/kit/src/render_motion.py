@@ -41,12 +41,14 @@ Env:
   KIT_MASTER=1        also export ProRes 4:4:4 master
 """
 import os, sys, json, glob, argparse, subprocess
+from pathlib import Path
 import gc
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import vram_governor as vg
 import gpu_scheduler
 import thermal_monitor
+from engine_policy import write_shot_manifest
 
 try:
     import torch
@@ -55,27 +57,44 @@ except Exception:
 
 _VRAM_RESERVED_PCT = 0.85
 
-def vram_mb():
+MiB = 1024 * 1024
+
+
+def vram_total_mb():
     if torch is None or not torch.cuda.is_available():
         return 0
-    return torch.cuda.mem_get_info(0)[0] // (1024 * 1024)
+    _free, total = torch.cuda.mem_get_info(int(os.environ.get("KIT_LOCAL_CUDA_DEVICE", "0")))
+    return total // MiB
+
+
+def vram_mb():
+    """Compatibility alias for total VRAM, not free VRAM."""
+    return vram_total_mb()
 
 def vram_free_mb():
     if torch is None or not torch.cuda.is_available():
         return 0
-    return torch.cuda.mem_get_info(0)[1] // (1024 * 1024)
+    free, _total = torch.cuda.mem_get_info(int(os.environ.get("KIT_LOCAL_CUDA_DEVICE", "0")))
+    return free // MiB
 
 def vram_pct_free():
     total = vram_mb() + vram_free_mb()
     return (vram_free_mb() / total) if total > 0 else 0.0
 
-def ensure_vram(headroom_mb=500):
+def ensure_vram(estimated_peak_mb=500):
+    """Require model peak plus the governor's non-negotiable T4 reserve."""
     if torch is None or not torch.cuda.is_available():
+        if os.environ.get("COMFY_MOCK") == "1":
+            return True
+        if os.environ.get("COMFY_MOCK") == "0" or os.environ.get("KIT_REQUIRE_GPU") == "1":
+            raise RuntimeError("GPU_TELEMETRY_UNAVAILABLE")
         return True
-    if vram_free_mb() < headroom_mb:
+    required = int(estimated_peak_mb) + vg.safety_margin_mb()
+    if vram_free_mb() < required:
         gc.collect()
         torch.cuda.empty_cache()
-    return vram_free_mb() >= headroom_mb
+    return vg.require_headroom(estimated_peak_mb, telemetry=vram_free_mb(),
+                               real_mode=(os.environ.get("COMFY_MOCK") == "0" or os.environ.get("KIT_REQUIRE_GPU") == "1"))
 
 def tune_cuda(granularity=128):
     if torch is None:
@@ -244,8 +263,10 @@ def render_motion(shot, cfg, root, work, shots, idx, gpu_idx=0):
     thermal_monitor.snapshot(gpu_idx, f"before_{sid}")
 
     # --- Memory pre-check ---
-    if not ensure_vram(500):
-        raise RuntimeError(f"[{sid}] VRAM insufficient ({vram_free_mb()}MB free, need 500MB headroom)")
+    estimated_peak_mb = int(cfg.get("estimated_peak_mb", 500))
+    if not ensure_vram(estimated_peak_mb):
+        need = estimated_peak_mb + vg.safety_margin_mb()
+        raise RuntimeError(f"[{sid}] VRAM insufficient ({vram_free_mb()}MB free, need {need}MB including reserve)")
 
     # Build the override dict — use VRAM-resolved params
     overrides = {
@@ -357,6 +378,11 @@ def render_motion(shot, cfg, root, work, shots, idx, gpu_idx=0):
                         "-pix_fmt", "yuv444p10le",
                         "-colorspace", "bt709", "-color_primaries", "bt709",
                         "-color_trc", "bt709", "-r", str(fps_val), master])
+
+    write_shot_manifest(Path(outdir), shot_id=sid, engine=os.environ.get("KIT_ENGINE", "wan"),
+                        regime=params["regime"], free_mb=params["free_mb"],
+                        physical_gpu_id=os.environ.get("KIT_PHYSICAL_GPU_ID", str(gpu_idx)),
+                        controls={k: params[k] for k in ("fp8", "model_offload", "sequential_offload", "attention_slicing", "vae_tiling", "vae_tile_size")})
 
     print(f"[ok] {sid} -> {outdir}/final.mp4 (motion from blueprint)")
 
@@ -578,6 +604,7 @@ def main():
     if a.smoke:
         shots = shots[:1]
     t0 = time.time()
+    physical_gpu = os.environ.get("KIT_PHYSICAL_GPU_ID")
     sched = gpu_scheduler.Scheduler()
     print(f"[motion] GPU scheduler active: {sched.gpu_count} GPU(s).")
     try:
@@ -594,9 +621,10 @@ def main():
                 if not ensure_vram(500):
                     print(f"[vram] skip {shot['id']} ({vram_free_mb()}MB free)")
                     continue
-            gpu_idx = sched.pick()
+            gpu_idx = 0 if physical_gpu is not None else sched.pick()
             render_motion(shot, cfg, root, work, shots, idx, gpu_idx=gpu_idx)
-            sched.finish(gpu_idx)
+            if physical_gpu is None:
+                sched.finish(gpu_idx)
             gc.collect()
             if torch is not None and torch.cuda.is_available():
                 torch.cuda.empty_cache()

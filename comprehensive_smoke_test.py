@@ -11,9 +11,11 @@ ROOT = Path(os.environ.get(
     r"C:\Users\Admin\Downloads\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit"))
 # Auto-fallback to the dev workspace path if the historical one is absent
 if not ROOT.is_dir():
-    alt = Path(r"C:\dev\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit")
-    if alt.is_dir():
-        ROOT = alt
+    for alt in (Path(r"C:\dev\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit"),
+                Path(r"D:\dev\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit")):
+        if alt.is_dir():
+            ROOT = alt
+            break
 SRC = ROOT / "src"
 os.chdir(ROOT)  # Run from kit directory so imports work
 sys.path.insert(0, str(SRC))
@@ -46,6 +48,7 @@ def gen_freeze_video(path, duration=2, fps=24):
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
                     "-i", f"testsrc2=size=256x144:rate={fps}:duration={duration}",
                     "-vf", f"loop=loop=1:size={fps}:start=0,setpts=N/FRAME_RATE/TB",
+                    "-t", str(duration),
                     "-c:v", "libx264", "-pix_fmt", "yuv420p", path], check=True)
 
 def gen_loud_audio(path, duration=2, lufs=-5, sr=48000):

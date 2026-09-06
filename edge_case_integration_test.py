@@ -31,11 +31,13 @@ SB_TEXT = dict(capture_output=True, text=True, encoding="utf-8", errors="replace
 
 ROOT = Path(os.environ.get(
     "GODSHAND_KIT_ROOT",
-    r"C:\Users\Admin\Downloads\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit"))
+    Path(__file__).resolve().parent / "GODSHAND_MASTER" / "GODSHAND_MASTER" / "kit"))
 if not ROOT.is_dir():
-    alt = Path(r"C:\dev\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit")
-    if alt.is_dir():
-        ROOT = alt
+    for alt in (Path(r"C:\dev\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit"),
+                Path(r"D:\dev\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit")):
+        if alt.is_dir():
+            ROOT = alt
+            break
 SRC = ROOT / "src"
 os.chdir(ROOT)
 sys.path.insert(0, str(SRC))
@@ -419,4 +421,3 @@ def test_edge_case_integration_suite():
     assert FAIL == 0, f"edge_case_integration_test reported {FAIL} failures (see [FAIL] lines above)"
     # PASS may legitimately be > 0; we only assert nothing failed.
     assert PASS > 0, "edge_case_integration_test did not run any assertions (broken harness)"
-

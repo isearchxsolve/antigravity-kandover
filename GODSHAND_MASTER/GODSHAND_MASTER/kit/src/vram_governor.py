@@ -12,6 +12,7 @@ T4-specific regimes with aggressive memory management:
 Pure stdlib -- no torch import here so it loads instantly even on cold start.
 """
 import os, subprocess, json, time
+from mock_logging import log
 
 QUERY_RETRY = 5
 QUERY_DELAY = 1.0
@@ -75,6 +76,24 @@ def free_mb(gpu_index=0):
     return 0
 
 
+def require_headroom(estimated_peak_mb, gpu_index=0, *, telemetry=None, real_mode=None):
+    """Fail closed unless free VRAM covers the model peak plus the 2GB reserve."""
+    real_mode = (os.environ.get("COMFY_MOCK") == "0" or os.environ.get("KIT_REQUIRE_GPU") == "1") if real_mode is None else real_mode
+    measured = free_mb(gpu_index) if telemetry is None else telemetry
+    if measured is None or measured <= 0:
+        log("ERROR", "telemetry_unavailable", stage="vram", gate="B1/B2",
+            gpu_index=gpu_index, estimated_peak_mb=estimated_peak_mb)
+        if real_mode:
+            raise RuntimeError("GPU_TELEMETRY_UNAVAILABLE")
+        return False
+    required = int(estimated_peak_mb) + safety_margin_mb()
+    approved = measured >= required
+    log("INFO" if approved else "ERROR", "headroom_decision", stage="vram", gate="B1/B2",
+        gpu_index=gpu_index, free_mb=measured, estimated_peak_mb=int(estimated_peak_mb),
+        reserve_mb=safety_margin_mb(), required_mb=required, verdict="PASS" if approved else "FAIL")
+    return approved
+
+
 def probe_all():
     """Return full GPU list with free_mb, temp, util. Empty list if no GPUs."""
     return _query_smi_robust()
@@ -102,11 +121,15 @@ def resolve_params(cfg, gpu_index=0, shot=None):
     model_offload, sequential_offload, cpu_offload_clip, cpu_offload_vae.
     """
     free = free_mb(gpu_index)
+    if free <= 0 and (os.environ.get("COMFY_MOCK") == "0" or os.environ.get("KIT_REQUIRE_GPU") == "1"):
+        raise RuntimeError("GPU_TELEMETRY_UNAVAILABLE")
     regime = pick_regime(free)
     base_w = int((shot or {}).get("width", cfg.get("width", 1280)))
     base_h = int((shot or {}).get("height", cfg.get("height", 704)))
     base_steps = int((shot or {}).get("steps", cfg.get("steps", 30)))
     base_seconds = float((shot or {}).get("dur", cfg.get("max_clip_seconds", 5)))
+    max_clip_seconds = float(cfg.get("max_clip_seconds", 5))
+    base_seconds = min(base_seconds, max_clip_seconds)
     
     out = {
         "regime": regime,

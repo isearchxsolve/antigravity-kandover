@@ -1,0 +1,17 @@
+{
+  "recorded_on": "2026-08-18",
+  "rationale": "Immutable commits and the CUDA 12.1 torch 2.4.1 family prevent fresh Kaggle kernels from resolving moving ComfyUI/custom-node heads.",
+  "torch": {
+    "index_url": "https://download.pytorch.org/whl/cu121",
+    "torch": "2.4.1",
+    "torchvision": "0.19.1",
+    "torchaudio": "2.4.1",
+    "cuda": "12.1"
+  },
+  "repositories": {
+    "ComfyUI": {"url": "https://github.com/comfyanonymous/ComfyUI.git", "revision": "c1739380c6fab78e7e263cb665d04aafbfe24593"},
+    "ComfyUI-GGUF": {"url": "https://github.com/city96/ComfyUI-GGUF.git", "revision": "6ea2651e7df66d7585f6ffee804b20e92fb38b8a"},
+    "ComfyUI-VideoHelperSuite": {"url": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git", "revision": "4ee72c065db22c9d96c2427954dc69e7b908444b"}
+  },
+  "required_node_schemas": ["UnetLoaderGGUF", "WanImageToVideo", "SaveImage"]
+}

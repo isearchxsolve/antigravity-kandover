@@ -28,6 +28,9 @@ ROOT = Path(os.environ.get(
     "GODSHAND_KIT_ROOT",
     r"C:\dev\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit"))
 if not ROOT.is_dir():
+    # Repo-relative fallback (works wherever the project is checked out)
+    ROOT = Path(__file__).parent / "GODSHAND_MASTER" / "GODSHAND_MASTER" / "kit"
+if not ROOT.is_dir():
     alt = Path(r"C:\Users\Admin\Downloads\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit")
     if alt.is_dir():
         ROOT = alt

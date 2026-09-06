@@ -26,26 +26,10 @@ GPU THROTTLE + OOM PREVENTION TEST (production path)
   [PASS] C3 comfy_client PYTORCH_CUDA_ALLOC_CONF matches notebook (128) -- comfy_client sets max_split_size_mb to 64, overriding notebook's 128
 
 [D] vram_governor T4 regime correctness
-  [PASS] D1 vram_governor returns valid regime for unknown GPU -- got regime=t4_critical
-  [PASS] D2 pick_regime(12*1024) == T4_PLENTY
-  [PASS] D3 pick_regime(8*1024) == T4_TIGHT
-  [PASS] D4 pick_regime(4*1024) == T4_DANGER
-  [PASS] D5 pick_regime(2*1024) == T4_CRITICAL
-  [PASS] D6 SAFE_RESERVE_MB >= 2048 -- SAFE_RESERVE_MB=2048
-
-[E] gpu_scheduler thermal settings
-  [PASS] E1 THROTTLE_TEMP_C <= 80 -- THROTTLE_TEMP_C=78
-  [PASS] E2 MIN_GAP_SEC >= 15 -- MIN_GAP_SEC=20.0
-  [PASS] E3 TEMP_GREEN_C < THROTTLE_TEMP_C -- TEMP_GREEN_C=70 >= THROTTLE_TEMP_C=78
-  [PASS] E4 Scheduler.pick() returns 0 when no GPUs -- Scheduler.pick() crashed or returned negative
-  [PASS] E5 Scheduler.finish(999) does not crash
-
-[F] render_motion OOM fallback tier correctness
-  [PASS] F1 OOM fallback rounds to multiples of 64 -- OOM fallback does not round resolution to VAE-compatible multiples of 64
-  [PASS] F2 OOM fallback has >= 4 tiers -- not enough fallback tiers
-  [PASS] F3 OOM fallback catches 'CUDA out of memory' -- OOM fallback does not catch CUDA OOM errors
-  [PASS] F4 OOM fallback calls gc.collect() on OOM -- OOM fallback does not call gc.collect()
-
-========================================================================
-RESULT: 32 passed, 0 failed
-========================================================================
+Traceback (most recent call last):
+  File "D:\dev\antigravity-kandover\test_gpu_throttle_oom.py", line 173, in <module>
+    params = vg.resolve_params({"width": 1280, "height": 720, "steps": 8, "max_clip_seconds": 5}, gpu_index=999)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\dev\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit\src\vram_governor.py", line 125, in resolve_params
+    raise RuntimeError("GPU_TELEMETRY_UNAVAILABLE")
+RuntimeError: GPU_TELEMETRY_UNAVAILABLE

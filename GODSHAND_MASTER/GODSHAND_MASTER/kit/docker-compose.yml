@@ -1,0 +1,143 @@
+version: '3.8'
+
+services:
+  godhand:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: godhand-kaggle-2t4
+    runtime: nvidia
+    environment:
+      # GPU Configuration for 2xT4 Kaggle
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,video
+      - CUDA_VISIBLE_DEVICES=0,1
+      
+      # PyTorch CUDA Memory Allocator - CRITICAL for zero OOM on 2xT4
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True,max_split_size_mb:128,garbage_collection_threshold:0.6
+      
+      # GODSHAND Kit Configuration - AGGRESSIVE for ZERO THROTTLE on 2xT4
+      - KIT_GPU_GAP_SEC=20
+      - KIT_GPU_THROTTLE_TEMP_C=78
+      - KIT_GPU_TEMP_GREEN_C=70
+      - KIT_GPU_TEMP_YELLOW_C=74
+      - KIT_GPU_COOLDOWN_POLL_SEC=2
+      - KIT_GPU_COOLDOWN_TIMEOUT_SEC=300
+      - KIT_PREDICTIVE_COOLDOWN=1
+      - KIT_VRAM_SAFETY_MB=2048
+      - KIT_LOW_VRAM=1
+      - KIT_SHOT_RETRIES=3
+      - KIT_THERMAL_LOG=/tmp/thermal_profile.jsonl
+      - KIT_PREDICTIVE_COOLDOWN=1
+      
+      # PyTorch settings for T4
+      - TORCH_CUDNN_V8_API_ENABLED=1
+      - TORCH_CUDNN_BENCHMARK=1
+      - TORCH_CUDNN_DETERMINISTIC=0
+      
+      # ComfyUI settings
+      - COMFYUI_PORT=8188
+      - COMFYUI_ARGS=--listen 0.0.0.0 --port 8188 --enable-cors-header --cuda-malloc
+      
+      # Kaggle specific
+      - KAGGLE_KERNEL_MODE=true
+      - KAGGLE_KERNEL_RUN_TYPE=Interactive
+      - KAGGLE_URL_BASE=https://www.kaggle.com
+      - KAGGLE_KERNEL_INTEGRATIONS=GCS
+      
+      # Python optimization
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONHASHSEED=42
+      
+      # CUDA optimization for T4
+      - CUDA_MODULE_LOADING=LAZY
+      - CUDA_CACHE_MAXSIZE=2147483647
+      
+      # Disable telemetry
+      - DO_NOT_TRACK=1
+      - ANONYMIZED_TELEMETRY=False
+      - HF_HUB_DISABLE_TELEMETRY=1
+      - HF_HUB_DISABLE_PROGRESS_BARS=1
+      
+      # HuggingFace
+      - HF_HOME=/workspace/hf_cache
+      - TRANSFORMERS_CACHE=/workspace/hf_cache
+      - HF_DATASETS_CACHE=/workspace/hf_cache
+      
+      # ComfyUI models
+      - COMFYUI_MODELS_DIR=/workspace/ComfyUI/models
+      
+    volumes:
+      # Kit source code
+      - ./kit:/opt/kit
+      # ComfyUI models (persistent)
+      - comfyui_models:/workspace/ComfyUI/models
+      # ComfyUI custom nodes
+      - comfyui_custom_nodes:/workspace/ComfyUI/custom_nodes
+      # HuggingFace cache
+      - hf_cache:/workspace/hf_cache
+      # Work directory for outputs
+      - workdir:/workspace/work
+      # Thermal logs
+      - thermal_logs:/tmp/thermal_logs
+      # Kaggle input (if running on Kaggle)
+      - kaggle_input:/kaggle/input
+      - kaggle_working:/kaggle/working
+      
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 2
+              capabilities: [gpu, compute, video]
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8188/system_stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    # Restart policy
+    restart: on-failure:3
+    
+    # Resource limits for Kaggle 2xT4 (16GB VRAM each, 16GB RAM each)
+    # Kaggle provides ~30GB RAM total, 2x T4 16GB VRAM
+    mem_limit: 28g
+    cpus: '8'
+    
+    # IPC mode for shared memory (needed for PyTorch multiprocessing)
+    ipc: host
+    
+    # Shared memory size for PyTorch multiprocessing
+    shm_size: 8g
+    
+    # Working directory
+    working_dir: /opt/kit
+    
+    # Command override (use entrypoint.sh)
+    # command: ["/opt/kit/entrypoint.sh"]
+
+volumes:
+  comfyui_models:
+    driver: local
+  comfyui_custom_nodes:
+    driver: local
+  hf_cache:
+    driver: local
+  workdir:
+    driver: local
+  thermal_logs:
+    driver: local
+  kaggle_input:
+    driver: local
+  kaggle_working:
+    driver: local
+
+networks:
+  default:
+    name: godhand-network
+    driver: bridge

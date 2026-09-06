@@ -1,0 +1,7 @@
+# GODSHAND Kaggle CUDA 12.1 lock -- install this file FIRST, before ComfyUI.
+# Recorded 2026-08-18 after source compatibility review; exact versions prevent
+# an upstream ComfyUI resolver from silently changing the CUDA torch family.
+--index-url https://download.pytorch.org/whl/cu121
+torch==2.4.1
+torchvision==0.19.1
+torchaudio==2.4.1

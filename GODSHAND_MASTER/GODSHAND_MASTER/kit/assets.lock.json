@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-08-18",
+  "assets": [
+    {"repo_id":"QuantStack/Wan2.2-I2V-A14B-GGUF","revision":"6c6717459277b9cd1f72579d78a0fd62a79e57dc","filename":"HighNoise/Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf","bytes":9651728896,"sha256":"836250abfaa3411694e2c9cf3a0cc18265329d5156d81aa116d5366b0f8f02e7","destination":"models/unet/Wan2.2-I2V-A14B-HighNoise-Q4_K_M.gguf","required":true},
+    {"repo_id":"QuantStack/Wan2.2-I2V-A14B-GGUF","revision":"6c6717459277b9cd1f72579d78a0fd62a79e57dc","filename":"LowNoise/Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf","bytes":9651728896,"sha256":"e2f98d834af009d035c6b0918268f2eba0aa8a63025ce942277e2384d40b0866","destination":"models/unet/Wan2.2-I2V-A14B-LowNoise-Q4_K_M.gguf","required":true},
+    {"repo_id":"Comfy-Org/Wan_2.2_ComfyUI_Repackaged","revision":"c4f60d30c55a624e35427060fdd217579a6c1d77","filename":"split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors","bytes":6735906897,"sha256":"c3355d30191f1f066b26d93fba017ae9809dce6c627dda5f6a66eaa651204f68","destination":"models/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors","required":true},
+    {"repo_id":"Comfy-Org/Wan_2.2_ComfyUI_Repackaged","revision":"c4f60d30c55a624e35427060fdd217579a6c1d77","filename":"split_files/vae/wan2.2_vae.safetensors","bytes":1409400960,"sha256":"e40321bd36b9709991dae2530eb4ac303dd168276980d3e9bc4b6e2b75fed156","destination":"models/vae/wan2.2_vae.safetensors","required":true},
+    {"repo_id":"Comfy-Org/Wan_2.2_ComfyUI_Repackaged","revision":"c4f60d30c55a624e35427060fdd217579a6c1d77","filename":"split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors","bytes":1226977424,"sha256":"d176c808d6fc461999b68e321efcb7501b20b8c3797523ed0df14f7d1deff11e","destination":"models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors","required":true},
+    {"repo_id":"Comfy-Org/Wan_2.2_ComfyUI_Repackaged","revision":"c4f60d30c55a624e35427060fdd217579a6c1d77","filename":"split_files/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors","bytes":1226977424,"sha256":"024f21de095bc8fad9809ded3e9e49a2e170dcf27075da8145ba7d60d8aab7f9","destination":"models/loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors","required":true},
+    {"repo_id":"ai-forever/Real-ESRGAN","revision":"a86fc6182b4650b4459cb1ddcb0a0d1ec86bf3b0","filename":"RealESRGAN_x4.pth","bytes":67040989,"sha256":"aa00f09ad753d88576b21ed977e97d634976377031b178acc3b5b238df463400","destination":"models/upscale_models/RealESRGAN_x4.pth","required":false}
+  ]
+}

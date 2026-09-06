@@ -1,6 +1,6 @@
 
 # cinema4k_sanity_test  --  6 groups, 9 selected
-# kit: C:\dev\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit
+# kit: D:\dev\antigravity-kandover\GODSHAND_MASTER\GODSHAND_MASTER\kit
 
 === P0 -- Resolution / Codec / Bit-Depth / Color ===
   [PASS] confrontation has 4K delivery block targeting >=3840x2160
@@ -127,8 +127,7 @@
   [PASS] zero-compromise module intact: src/thermal_monitor.py
 
 === P7.1 -- DCP SPL Verification ===
-  [SKIP] DCP SPL verification  ::  PowerShell error: ForEach-Object : Cannot bind parameter 'RemainingScripts'. Cannot convert the "-NoProfile" value of type "System.String" to type 
-"System.Management.Automation.ScriptBlock".
+  [SKIP] DCP SPL verification  ::  PowerShell error: ForEach-Object : Cannot bind parameter 'RemainingScripts'. Cannot convert the "-NoProfile" value of type "System.String" to type "System.Management.Automation.ScriptBlock".
 At line:1 char:191
 + ...  | Select-Object -First 1 | ForEach-Object { $_.FullName } -NoProfile
 +                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
