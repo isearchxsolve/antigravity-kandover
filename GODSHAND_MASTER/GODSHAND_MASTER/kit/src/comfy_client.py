@@ -44,6 +44,40 @@ class ComfyClient:
     def _get(self, path):
         return json.load(urllib.request.urlopen(self.base + path, timeout=120))
 
+    def _upload(self, path):
+        """POST a local image to the server's input dir; return its server-side name.
+
+        Newer ComfyUI LoadImage validation rejects absolute client paths, so the
+        file must live inside the server's input tree. Falls back to the raw path
+        (old same-machine behavior) if the upload fails.
+        """
+        try:
+            import mimetypes
+            boundary = "----godshand%s" % uuid.uuid4().hex
+            with open(path, "rb") as fh:
+                body = fh.read()
+            name = os.path.basename(path)
+            ctype = mimetypes.guess_type(name)[0] or "application/octet-stream"
+            parts = [
+                b"--" + boundary.encode(),
+                ('Content-Disposition: form-data; name="image"; filename="%s"' % name).encode(),
+                ("Content-Type: %s" % ctype).encode(), b"",
+                body,
+                b"--" + boundary.encode() + b"--", b"",
+            ]
+            data = b"\r\n".join(parts)
+            req = urllib.request.Request(
+                self.base + "/upload/image", data=data,
+                headers={"Content-Type": "multipart/form-data; boundary=%s" % boundary})
+            resp = json.load(urllib.request.urlopen(req, timeout=120))
+            srv = resp.get("name") if isinstance(resp, dict) else None
+            if srv:
+                print(f"[comfy] uploaded {name} -> input/{srv}")
+                return srv
+        except Exception as e:
+            print(f"[comfy] WARNING: upload failed ({e!r}); using raw path.")
+        return path
+
     @staticmethod
     def _first_image(d):
         if not d or not os.path.isdir(d):
@@ -77,11 +111,11 @@ class ComfyClient:
                         break
                 if not img:
                     continue
-                val = img
+                val = self._upload(img)
             elif key == "identity_images" and isinstance(val, (list, tuple)):
                 if not val:
                     continue
-                val = val[0]  # core LoadImage takes one file; add nodes for more anchors
+                val = self._upload(val[0])  # core LoadImage takes one file; add nodes for more anchors
             node[input_name] = val
         return graph
 
